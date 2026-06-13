@@ -1,11 +1,16 @@
 from groq import Groq
 import os
 import json
-import torch
 from dotenv import load_dotenv
 from app.rag import get_travel_context
-from app.local_model import generate_local
+from app.local_model import generate_local, TORCH_AVAILABLE
 from app.hf_model import generate_hf
+
+try:
+    import torch
+    CUDA_AVAILABLE = torch.cuda.is_available()
+except ImportError:
+    CUDA_AVAILABLE = False
 
 load_dotenv()
 
@@ -22,7 +27,7 @@ def generate_itinerary(preferences: dict) -> dict:
     intereses_str = ', '.join(intereses)
 
     # 1. GPU disponible → modelo local
-    if torch.cuda.is_available():
+    if TORCH_AVAILABLE and CUDA_AVAILABLE:
         try:
             resultado = generate_local(destino, presupuesto, tipo_viajero, ritmo, intereses_str)
             print(f"[LOCAL] Itinerario generado para {destino}")

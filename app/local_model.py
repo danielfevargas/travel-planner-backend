@@ -1,7 +1,12 @@
-import torch
 import json
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel
+
+try:
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from peft import PeftModel
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
 
 _model = None
 _tokenizer = None
@@ -30,6 +35,9 @@ def get_model():
     return _model, _tokenizer
 
 def generate_local(destino, presupuesto, viajero, ritmo, intereses):
+    if not TORCH_AVAILABLE:
+        raise RuntimeError("torch no está instalado")
+
     model, tokenizer = get_model()
 
     prompt = f"Genera un itinerario para {destino}, presupuesto {presupuesto}, viajero {viajero}, ritmo {ritmo}, intereses: {intereses}"
