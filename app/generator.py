@@ -1,9 +1,11 @@
 from groq import Groq
 import os
 import json
+import torch
 from dotenv import load_dotenv
 from app.rag import get_travel_context
 from app.local_model import generate_local
+from app.hf_model import generate_hf
 
 load_dotenv()
 
@@ -17,15 +19,28 @@ def generate_itinerary(preferences: dict) -> dict:
     tipo_viajero = preferences.get("traveler_type", "solo")
     ritmo = preferences.get("pace", "equilibrado")
     intereses = preferences.get("interests", [])
+    intereses_str = ', '.join(intereses)
 
-    # Intentar con modelo local primero
-    try:
-        intereses_str = ', '.join(intereses)
-        resultado = generate_local(destino, presupuesto, tipo_viajero, ritmo, intereses_str)
-        print(f"[LOCAL] Itinerario generado para {destino}")
-        return resultado
-    except Exception as e:
-        print(f"[FALLBACK GROQ] Modelo local falló ({e}), usando Groq...")
+    # 1. GPU disponible → modelo local
+    if torch.cuda.is_available():
+        try:
+            resultado = generate_local(destino, presupuesto, tipo_viajero, ritmo, intereses_str)
+            print(f"[LOCAL] Itinerario generado para {destino}")
+            return resultado
+        except Exception as e:
+            print(f"[LOCAL FALLÓ] {e}")
+
+    # 2. Sin GPU pero hay HF_TOKEN → HuggingFace Inference API
+    if os.getenv("HF_TOKEN"):
+        try:
+            resultado = generate_hf(destino, presupuesto, tipo_viajero, ritmo, intereses_str)
+            print(f"[HF API] Itinerario generado para {destino}")
+            return resultado
+        except Exception as e:
+            print(f"[HF API FALLÓ] {e}")
+
+    # 3. Fallback → Groq
+    print(f"[GROQ] Generando itinerario para {destino}...")
 
     contexto = get_travel_context(presupuesto, ritmo, tipo_viajero)
 
